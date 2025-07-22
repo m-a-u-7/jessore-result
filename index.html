@@ -1,0 +1,45 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Jessore Board Result</title>
+</head>
+<body>
+  <h2>Jessore Board Result Checker</h2>
+  <form id="resultForm">
+    Roll: <input type="text" name="roll" required><br>
+    Reg No: <input type="text" name="regno" required><br>
+    <button type="submit">Check Result</button>
+  </form>
+  <div id="result"></div>
+
+  <script>
+    document.getElementById('resultForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        roll: form.roll.value,
+        regno: form.regno.value
+      };
+
+      const res = await fetch('/api/check', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+
+      const result = await res.json();
+      if (result.error) {
+        document.getElementById('result').innerText = 'Error: ' + result.error;
+      } else {
+        document.getElementById('result').innerHTML = `
+          <h3>${result.name}</h3>
+          <p>GPA: ${result.gpa}</p>
+          <table border="1">${result.resultHtml}</table>
+        `;
+      }
+    };
+  </script>
+</body>
+</html>

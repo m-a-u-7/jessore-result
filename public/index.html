@@ -1,70 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Jessore Board Result Checker</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f0f0f0;
-      text-align: center;
-      margin-top: 50px;
-    }
-    input, button {
-      padding: 10px;
-      margin: 5px;
-    }
-    #result {
-      margin-top: 20px;
-      background: #fff;
-      padding: 15px;
-      border-radius: 5px;
-      width: 80%;
-      margin-left: auto;
-      margin-right: auto;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
+    body { font-family: sans-serif; background: #f5f5f5; padding: 30px; }
+    h1 { color: #333; }
+    input, button { padding: 10px; margin: 5px 0; width: 100%; }
+    #result { background: #fff; padding: 15px; margin-top: 15px; border: 1px solid #ccc; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h2>Jessore Board Result Checker</h2>
-  <input type="text" id="roll" placeholder="Enter Roll">
-  <input type="text" id="regno" placeholder="Enter Registration No">
-  <button onclick="getResult()">Check Result</button>
+  <h1>Jessore Board Result Checker</h1>
+  <form id="resultForm">
+    <input type="text" name="roll" placeholder="Roll Number" required />
+    <input type="text" name="regno" placeholder="Registration Number" required />
+    <button type="submit">Check Result</button>
+  </form>
   <div id="result"></div>
 
   <script>
-    async function getResult() {
-      const roll = document.getElementById('roll').value;
-      const regno = document.getElementById('regno').value;
-      if (!roll || !regno) {
-        alert("Please enter both roll and registration number");
-        return;
-      }
+    document.getElementById('resultForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const roll = form.roll.value;
+      const regno = form.regno.value;
 
-      const formData = new URLSearchParams();
-      formData.append("roll", roll);
-      formData.append("regno", regno);
+      const res = await fetch('/api/check-result', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roll, regno })
+      });
 
-      try {
-        const response = await fetch("/check-result", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: formData
-        });
-        const text = await response.text();
-        try {
-          const json = JSON.parse(text);
-          document.getElementById('result').innerText = JSON.stringify(json, null, 2);
-        } catch (e) {
-          document.getElementById('result').innerHTML = "<pre>" + text + "</pre>";
-        }
-      } catch (error) {
-        document.getElementById('result').innerText = "Error: " + error;
-      }
-    }
+      const text = await res.text();
+      document.getElementById('result').innerText = text;
+    });
   </script>
 </body>
 </html>

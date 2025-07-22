@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: jessore-puppeteer-server
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    autoDeploy: false
+    

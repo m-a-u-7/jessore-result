@@ -1,106 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
   <title>Jessore Board Result</title>
   <style>
-    body {
-      background: #f7f7f7;
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 600px;
-      margin: auto;
-    }
-    h2 {
-      text-align: center;
-      color: #222;
-    }
-    form {
-      background: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    input {
-      width: 100%;
-      padding: 10px;
-      margin: 10px 0;
-      font-size: 16px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-    button {
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      font-size: 16px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #0056b3;
-    }
-    .result {
-      margin-top: 20px;
-      background: #fff;
-      padding: 15px;
-      border-radius: 10px;
-    }
-    .error {
-      color: red;
-    }
+    body { font-family: Arial; padding: 20px; background: #f9f9f9; }
+    input, button { padding: 10px; margin: 5px; }
+    #result { margin-top: 20px; white-space: pre-wrap; background: #eee; padding: 10px; border-radius: 5px; }
   </style>
 </head>
 <body>
   <h2>Jessore Board Result Checker</h2>
   <form id="resultForm">
-    <input type="text" name="roll" id="roll" placeholder="Enter Roll Number" required />
-    <input type="text" name="regno" id="regno" placeholder="Enter Registration Number" required />
+    <input type="text" id="roll" placeholder="Roll Number" required>
+    <input type="text" id="regno" placeholder="Registration Number" required>
     <button type="submit">Check Result</button>
   </form>
-
-  <div class="result" id="resultContainer" style="display:none;"></div>
+  <div id="result"></div>
 
   <script>
-    const form = document.getElementById('resultForm');
-    const resultContainer = document.getElementById('resultContainer');
-
-    form.addEventListener('submit', async (e) => {
+    document.getElementById('resultForm').addEventListener('submit', async function(e) {
       e.preventDefault();
-      resultContainer.innerHTML = "Loading...";
-      resultContainer.style.display = "block";
-
       const roll = document.getElementById('roll').value;
       const regno = document.getElementById('regno').value;
 
-      try {
-        const res = await fetch('https://jessore-result.onrender.com/api/result', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ roll, regno })
-        });
+      const res = await fetch('https://jessore-result.onrender.com/api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roll, regno })
+      });
 
-        const data = await res.json();
-
-        if (data.error || !data.result || data.result.length === 0) {
-          resultContainer.innerHTML = `<p class="error">Result not found. Please check roll and reg number.</p>`;
-          return;
-        }
-
-        let html = '<h3>Result Found:</h3><table border="1" cellpadding="8">';
-        data.result.forEach(row => {
-          html += '<tr>' + row.map(cell => `<td>${cell}</td>`).join('') + '</tr>';
-        });
-        html += '</table>';
-        resultContainer.innerHTML = html;
-
-      } catch (err) {
-        resultContainer.innerHTML = `<p class="error">Error fetching result. Try again later.</p>`;
-      }
+      const text = await res.text();
+      document.getElementById('result').innerText = text;
     });
   </script>
 </body>

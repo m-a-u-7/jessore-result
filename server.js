@@ -1,8 +1,10 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const axios = require('axios');
+const axios = require('axios').default;
 const qs = require('qs');
 const cors = require('cors');
+const tough = require('tough-cookie');
+const { wrapper } = require('axios-cookiejar-support');
 
 const app = express();
 app.use(cors());
@@ -12,7 +14,10 @@ app.post('/api', async (req, res) => {
   const { roll, regno } = req.body;
 
   try {
-    const response = await axios.post(
+    const jar = new tough.CookieJar();
+    const client = wrapper(axios.create({ jar }));
+
+    const postResponse = await client.post(
       'https://www.jessoreboard.gov.bd/resultjbs25/result.php',
       qs.stringify({ roll, regno }),
       {
@@ -23,10 +28,11 @@ app.post('/api', async (req, res) => {
           'Origin': 'https://www.jessoreboard.gov.bd',
           'Referer': 'https://www.jessoreboard.gov.bd/resultjbs25/',
         },
+        maxRedirects: 5,
       }
     );
 
-    res.send(response.data);
+    res.send(postResponse.data);
   } catch (error) {
     res.status(500).send('Error fetching result: ' + error.message);
   }

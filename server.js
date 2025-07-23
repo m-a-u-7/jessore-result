@@ -1,44 +1,37 @@
 const express = require('express');
+const puppeteer = require('puppeteer');
 const bodyParser = require('body-parser');
-const axios = require('axios').default;
-const qs = require('qs');
-const cors = require('cors');
-const tough = require('tough-cookie');
-const { wrapper } = require('axios-cookiejar-support');
-
 const app = express();
-app.use(cors());
+const PORT = process.env.PORT || 3000;
+
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.post('/api', async (req, res) => {
+app.post('/result', async (req, res) => {
   const { roll, regno } = req.body;
+  if (!roll || !regno) return res.status(400).json({ error: 'Missing roll or regno' });
 
   try {
-    const jar = new tough.CookieJar();
-    const client = wrapper(axios.create({ jar }));
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+    await page.goto('https://www.jessoreboard.gov.bd/resultjbs25/', { waitUntil: 'networkidle2' });
 
-    const postResponse = await client.post(
-      'https://www.jessoreboard.gov.bd/resultjbs25/result.php',
-      qs.stringify({ roll, regno }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0',
-          'X-Requested-With': 'XMLHttpRequest',
-          'Origin': 'https://www.jessoreboard.gov.bd',
-          'Referer': 'https://www.jessoreboard.gov.bd/resultjbs25/',
-        },
-        maxRedirects: 5,
-      }
-    );
+    await page.type('input[name=roll]', roll);
+    await page.type('input[name=regno]', regno);
+    await Promise.all([
+      page.click('input[type=submit]'),
+      page.waitForNavigation({ waitUntil: 'networkidle2' })
+    ]);
 
-    res.send(postResponse.data);
+    const content = await page.content();
+    await browser.close();
+
+    res.send(content);
   } catch (error) {
-    res.status(500).send('Error fetching result: ' + error.message);
+    res.status(500).json({ error: error.toString() });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

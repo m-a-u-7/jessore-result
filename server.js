@@ -27,6 +27,9 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Helper function to wait
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Main API endpoint for checking results
 app.post('/api/check-result', async (req, res) => {
     try {
@@ -41,52 +44,92 @@ app.post('/api/check-result', async (req, res) => {
 
         console.log(`Checking result for roll: ${roll}, regno: ${regno}`);
 
-        // Create axios instance with session-like behavior
+        // Create axios instance with session-like behavior and cookie jar
         const axiosInstance = axios.create({
-            timeout: 30000,
+            timeout: 45000,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Linux; Android 14; TrebleDroid vanilla Build/AP2A.240905.003) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.7151.72 Safari/537.36',
                 'Accept': '*/*',
-                'Accept-Language': 'en-US,en;q=0.9'
-            }
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive'
+            },
+            withCredentials: true
         });
 
-        // First, visit the main page to get cookies
+        // First, visit the main page to get cookies and establish session
         const mainUrl = 'https://www.jessoreboard.gov.bd/resultjbs25/';
-        console.log('Getting initial cookies...');
-        await axiosInstance.get(mainUrl);
+        console.log('Getting initial cookies and establishing session...');
+        
+        try {
+            const mainResponse = await axiosInstance.get(mainUrl);
+            console.log('Main page loaded, cookies received');
+            
+            // Extract any cookies from the response
+            const cookies = mainResponse.headers['set-cookie'];
+            if (cookies) {
+                console.log('Cookies found:', cookies);
+            }
+        } catch (error) {
+            console.log('Error loading main page:', error.message);
+        }
 
-        // Wait a moment
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait longer to ensure the session is established
+        console.log('Waiting 5 seconds for session establishment...');
+        await wait(5000);
 
         // API details
         const apiUrl = 'https://www.jessoreboard.gov.bd/resultjbs25/result.php';
         const formData = new URLSearchParams({
-            roll: roll,
-            regno: regno
+            roll: roll.toString(),
+            regno: regno.toString()
         });
 
         const headers = {
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-Requested-With': 'XMLHttpRequest',
             'Origin': 'https://www.jessoreboard.gov.bd',
-            'Referer': 'https://www.jessoreboard.gov.bd/resultjbs25/'
+            'Referer': 'https://www.jessoreboard.gov.bd/resultjbs25/',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
         };
 
-        console.log('Making API call...');
+        console.log('Making initial API call...');
         let response = await axiosInstance.post(apiUrl, formData.toString(), { headers });
+        let attemptCount = 1;
+        const maxAttempts = 5;
 
-        // If we get a loading page, wait and try again
-        if (response.data.includes('Loading')) {
-            console.log('Got loading page, waiting 3 seconds and trying again...');
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            response = await axiosInstance.post(apiUrl, formData.toString(), { headers });
+        // Keep trying until we get a proper response or reach max attempts
+        while (response.data.includes('Loading') && attemptCount < maxAttempts) {
+            console.log(`Got loading page, attempt ${attemptCount}. Waiting 4 seconds and trying again...`);
+            await wait(4000);
+            
+            try {
+                response = await axiosInstance.post(apiUrl, formData.toString(), { headers });
+                attemptCount++;
+            } catch (error) {
+                console.log(`Attempt ${attemptCount} failed:`, error.message);
+                attemptCount++;
+                if (attemptCount >= maxAttempts) {
+                    throw error;
+                }
+            }
         }
 
         if (response.status !== 200) {
             return res.status(500).json({
                 success: false,
                 error: 'Failed to fetch result from server'
+            });
+        }
+
+        // Check if we still have loading page after all attempts
+        if (response.data.includes('Loading')) {
+            console.log('Still getting loading page after all attempts');
+            return res.json({
+                success: false,
+                error: 'Server is taking too long to respond. Please try again later.',
+                raw_html: response.data
             });
         }
 
@@ -97,6 +140,8 @@ app.post('/api/check-result', async (req, res) => {
                 error: 'No result found for the provided roll and registration number'
             });
         }
+
+        console.log('Got valid response, parsing HTML...');
 
         // Parse the HTML response using Cheerio
         const $ = cheerio.load(response.data);
@@ -146,7 +191,7 @@ app.post('/api/check-result', async (req, res) => {
             resultData.gpa = gpaMatch[1];
         }
 
-        console.log('Result parsed successfully');
+        console.log(`Result parsed successfully. Found ${subjects.length} subjects.`);
 
         // Return the parsed result
         res.json({
@@ -171,3 +216,4 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`API endpoint: http://localhost:${PORT}/api/check-result`);
 });
 
+         
